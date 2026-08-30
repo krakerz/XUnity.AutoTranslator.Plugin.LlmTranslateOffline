@@ -1,0 +1,7 @@
+/home/rie_zel/works/xautotrans/XUnity.AutoTranslator.Plugin.LlmTranslateOffline/bin/Release/XUnity.AutoTranslator.Plugin.LlmTranslateOffline.dll
+/home/rie_zel/works/xautotrans/XUnity.AutoTranslator.Plugin.LlmTranslateOffline/bin/Release/XUnity.AutoTranslator.Plugin.LlmTranslateOffline.pdb
+/home/rie_zel/works/xautotrans/XUnity.AutoTranslator.Plugin.LlmTranslateOffline/obj/Release/XUnity.AutoTranslator.Plugin.LlmTranslateOffline.csproj.AssemblyReference.cache
+/home/rie_zel/works/xautotrans/XUnity.AutoTranslator.Plugin.LlmTranslateOffline/obj/Release/XUnity.AutoTranslator.Plugin.LlmTranslateOffline.GeneratedMSBuildEditorConfig.editorconfig
+/home/rie_zel/works/xautotrans/XUnity.AutoTranslator.Plugin.LlmTranslateOffline/obj/Release/XUnity.AutoTranslator.Plugin.LlmTranslateOffline.csproj.CoreCompileInputs.cache
+/home/rie_zel/works/xautotrans/XUnity.AutoTranslator.Plugin.LlmTranslateOffline/obj/Release/XUnity.AutoTranslator.Plugin.LlmTranslateOffline.dll
+/home/rie_zel/works/xautotrans/XUnity.AutoTranslator.Plugin.LlmTranslateOffline/obj/Release/XUnity.AutoTranslator.Plugin.LlmTranslateOffline.pdb

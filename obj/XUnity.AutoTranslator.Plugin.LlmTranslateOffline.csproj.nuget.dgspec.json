@@ -1,0 +1,59 @@
+{
+  "format": 1,
+  "restore": {
+    "/home/rie_zel/works/xautotrans/XUnity.AutoTranslator.Plugin.LlmTranslateOffline/XUnity.AutoTranslator.Plugin.LlmTranslateOffline.csproj": {}
+  },
+  "projects": {
+    "/home/rie_zel/works/xautotrans/XUnity.AutoTranslator.Plugin.LlmTranslateOffline/XUnity.AutoTranslator.Plugin.LlmTranslateOffline.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/rie_zel/works/xautotrans/XUnity.AutoTranslator.Plugin.LlmTranslateOffline/XUnity.AutoTranslator.Plugin.LlmTranslateOffline.csproj",
+        "projectName": "XUnity.AutoTranslator.Plugin.LlmTranslateOffline",
+        "projectPath": "/home/rie_zel/works/xautotrans/XUnity.AutoTranslator.Plugin.LlmTranslateOffline/XUnity.AutoTranslator.Plugin.LlmTranslateOffline.csproj",
+        "packagesPath": "/home/rie_zel/.nuget/packages/",
+        "outputPath": "/home/rie_zel/works/xautotrans/XUnity.AutoTranslator.Plugin.LlmTranslateOffline/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/rie_zel/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "net472"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net472": {
+            "targetAlias": "net472",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "10.0.100"
+      },
+      "frameworks": {
+        "net472": {
+          "targetAlias": "net472",
+          "dependencies": {
+            "Microsoft.NETFramework.ReferenceAssemblies": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[1.0.3, )",
+              "autoReferenced": true
+            }
+          },
+          "runtimeIdentifierGraphPath": "/usr/share/dotnet/sdk/10.0.111/RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}

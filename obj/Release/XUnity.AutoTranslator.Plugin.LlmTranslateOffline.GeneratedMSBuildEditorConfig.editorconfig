@@ -1,0 +1,8 @@
+is_global = true
+build_property.RootNamespace = XUnity.AutoTranslator.Plugin.LlmTranslateOffline
+build_property.ProjectDir = /home/rie_zel/works/xautotrans/XUnity.AutoTranslator.Plugin.LlmTranslateOffline/
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.CsWinRTUseWindowsUIXamlProjections = false
+build_property.EffectiveAnalysisLevelStyle = 
+build_property.EnableCodeStyleSeverity = 
