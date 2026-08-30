@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.1.1] - 2026-08-30
+
+### Fixed
+
+- Worked around a Mono-on-Wine bug where the first `WebRequest`/`WebClient` call in the
+  process throws `NullReferenceException` from
+  `System.Net.AutoWebProxyScriptEngine.InitializeRegistryGlobalProxy` while trying to read
+  proxy settings from the (nonexistent) Windows registry. This crashed both
+  XUnity.AutoTranslator's own primary request pipeline and this plugin's alternative-endpoint
+  `HttpWebRequest` calls, so failover never had a chance to run. Fixed by explicitly setting
+  `WebRequest.DefaultWebProxy = null` once, early in `Initialize()`.
+
 ## [2.1.0] - 2026-08-30
 
 ### Changed (Breaking)

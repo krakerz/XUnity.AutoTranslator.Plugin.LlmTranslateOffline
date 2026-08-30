@@ -31,6 +31,8 @@ namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline
 
         public override void Initialize(IInitializationContext context)
         {
+            WorkAroundMonoWineProxyBug();
+
             var path = LlmConfig.ResolvePath(context.TranslatorDirectory);
             _config = LlmConfig.LoadOrCreate(path);
 
@@ -38,6 +40,27 @@ namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline
             XuaLogger.AutoTranslator.Info(
                 $"LlmTranslateOffline v{version} loaded. Primary endpoint: {_config.Endpoint} (model: {_config.Model}). " +
                 $"Alternative endpoints configured: {_config.Alternatives.Count}.");
+        }
+
+        // Under Mono-on-Wine, the very first WebRequest/WebClient call in the process lazily
+        // triggers WebRequest.InternalDefaultWebProxy, which tries to read proxy settings from
+        // the (nonexistent) Windows registry and throws a NullReferenceException from
+        // AutoWebProxyScriptEngine.InitializeRegistryGlobalProxy. That crash happens inside
+        // XUnity.AutoTranslator's own request pipeline too, before our endpoint even gets a
+        // chance to fail over to an alternative. Explicitly assigning DefaultWebProxy short-
+        // circuits that lazy lookup for the whole process, fixing both the framework's request
+        // and our own HttpWebRequest calls in TrySendSync.
+        private static void WorkAroundMonoWineProxyBug()
+        {
+            try
+            {
+                WebRequest.DefaultWebProxy = null;
+            }
+            catch
+            {
+                // Best-effort only; if this host doesn't have the bug (or doesn't allow the
+                // assignment), just fall through and let requests behave as they normally would.
+            }
         }
 
         public override void OnCreateRequest(IHttpRequestCreationContext context)
