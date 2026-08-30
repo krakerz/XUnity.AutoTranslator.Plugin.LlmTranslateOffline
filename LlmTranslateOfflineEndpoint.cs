@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -35,17 +36,66 @@ namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline
 
         public override void OnCreateRequest(IHttpRequestCreationContext context)
         {
+            var primary = new LlmEndpointTarget { Endpoint = _config.Endpoint, ApiKey = _config.ApiKey, Model = _config.Model };
+            var (systemPrompt, userPrompt) = BuildPrompts(context);
+
+            context.Complete(BuildRequest(primary, systemPrompt, userPrompt));
+        }
+
+        public override void OnExtractTranslation(IHttpTranslationExtractionContext context)
+        {
+            var response = context.Response;
+            string content = null, parseError = null;
+            if (response.Code == HttpStatusCode.OK && TryExtractContent(response.Data, out content, out parseError))
+            {
+                context.Complete(FinalizeContent(content));
+                return;
+            }
+
+            var primaryError = response.Code == HttpStatusCode.OK
+                ? $"Endpoint '{_config.Endpoint}' returned an unparsable response: {parseError}"
+                : $"Endpoint '{_config.Endpoint}' returned HTTP {(int)response.Code}: {response.Data}";
+
+            if (_config.Fallbacks.Count == 0)
+            {
+                context.Fail(primaryError, null);
+                return;
+            }
+
+            var (systemPrompt, userPrompt) = BuildPrompts(context);
+            var errors = new List<string> { primaryError };
+
+            foreach (var fallback in _config.Fallbacks)
+            {
+                if (TrySendSync(fallback, systemPrompt, userPrompt, out var fallbackContent, out var fallbackError))
+                {
+                    context.Complete(FinalizeContent(fallbackContent));
+                    return;
+                }
+
+                errors.Add(fallbackError);
+            }
+
+            context.Fail("All LLM endpoints failed:\n" + string.Join("\n", errors), null);
+        }
+
+        private (string systemPrompt, string userPrompt) BuildPrompts(ITranslationContextBase context)
+        {
             var sourceLanguage = string.IsNullOrEmpty(_config.SourceLanguage) ? context.SourceLanguage : _config.SourceLanguage;
             var destinationLanguage = string.IsNullOrEmpty(_config.DestinationLanguage) ? context.DestinationLanguage : _config.DestinationLanguage;
 
             var systemPrompt = ApplyPlaceholders(_config.SystemPrompt, sourceLanguage, destinationLanguage, null);
             var userPrompt = ApplyPlaceholders(_config.UserPromptTemplate, sourceLanguage, destinationLanguage, context.UntranslatedText);
+            return (systemPrompt, userPrompt);
+        }
 
+        private string BuildRequestBody(LlmEndpointTarget target, string systemPrompt, string userPrompt)
+        {
             var body = new StringBuilder();
             body.Append('{');
 
             body.Append("\"model\":");
-            MiniJson.WriteString(body, _config.Model);
+            MiniJson.WriteString(body, target.Model);
 
             body.Append(",\"messages\":[{\"role\":\"system\",\"content\":");
             MiniJson.WriteString(body, systemPrompt);
@@ -59,53 +109,124 @@ namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline
             body.Append(",\"stream\":false");
             body.Append('}');
 
-            var request = new XUnityWebRequest("POST", _config.Endpoint, body.ToString());
+            return body.ToString();
+        }
+
+        private XUnityWebRequest BuildRequest(LlmEndpointTarget target, string systemPrompt, string userPrompt)
+        {
+            var request = new XUnityWebRequest("POST", target.Endpoint, BuildRequestBody(target, systemPrompt, userPrompt));
             request.Headers = new WebHeaderCollection
             {
                 { HttpRequestHeader.ContentType, "application/json" }
             };
-            if (!string.IsNullOrEmpty(_config.ApiKey))
+            if (!string.IsNullOrEmpty(target.ApiKey))
             {
-                request.Headers[HttpRequestHeader.Authorization] = "Bearer " + _config.ApiKey;
+                request.Headers[HttpRequestHeader.Authorization] = "Bearer " + target.ApiKey;
             }
 
-            context.Complete(request);
+            return request;
         }
 
-        public override void OnExtractTranslation(IHttpTranslationExtractionContext context)
+        // Synchronously calls a fallback endpoint. Safe to block here: this endpoint's
+        // MaxConcurrency is 1, and the framework already runs HTTP work off the main thread.
+        private bool TrySendSync(LlmEndpointTarget target, string systemPrompt, string userPrompt, out string content, out string error)
         {
-            var response = context.Response;
-            if (response.Code != HttpStatusCode.OK)
-            {
-                context.Fail($"LLM endpoint '{_config.Endpoint}' returned HTTP {(int)response.Code}: {response.Data}", null);
-                return;
-            }
+            content = null;
+            error = null;
 
             try
             {
-                var root = MiniJson.Parse(response.Data) as Dictionary<string, object>;
-                var choices = root?["choices"] as List<object>;
-                var firstChoice = choices?[0] as Dictionary<string, object>;
-                var message = firstChoice?["message"] as Dictionary<string, object>;
-                var content = message?["content"] as string;
-
-                if (string.IsNullOrEmpty(content))
+                var webRequest = (HttpWebRequest)WebRequest.Create(target.Endpoint);
+                webRequest.Method = "POST";
+                webRequest.ContentType = "application/json";
+                webRequest.Timeout = Math.Max(1, _config.FallbackTimeoutSeconds) * 1000;
+                if (!string.IsNullOrEmpty(target.ApiKey))
                 {
-                    context.Fail("LLM response did not contain any message content.", null);
-                    return;
+                    webRequest.Headers[HttpRequestHeader.Authorization] = "Bearer " + target.ApiKey;
                 }
 
-                if (_config.StripReasoning)
+                var bytes = Encoding.UTF8.GetBytes(BuildRequestBody(target, systemPrompt, userPrompt));
+                webRequest.ContentLength = bytes.Length;
+                using (var requestStream = webRequest.GetRequestStream())
                 {
-                    content = ThinkTagRegex.Replace(content, string.Empty);
+                    requestStream.Write(bytes, 0, bytes.Length);
                 }
 
-                context.Complete(content.Trim());
+                using (var webResponse = (HttpWebResponse)webRequest.GetResponse())
+                using (var responseStream = webResponse.GetResponseStream())
+                using (var reader = new StreamReader(responseStream, Encoding.UTF8))
+                {
+                    var data = reader.ReadToEnd();
+                    if (TryExtractContent(data, out content, out var parseError))
+                    {
+                        return true;
+                    }
+
+                    error = $"Endpoint '{target.Endpoint}' returned an unparsable response: {parseError}";
+                    return false;
+                }
+            }
+            catch (WebException ex)
+            {
+                string body = null;
+                if (ex.Response is HttpWebResponse errorResponse)
+                {
+                    using (var responseStream = errorResponse.GetResponseStream())
+                    using (var reader = new StreamReader(responseStream, Encoding.UTF8))
+                    {
+                        body = reader.ReadToEnd();
+                    }
+                }
+
+                error = body != null
+                    ? $"Endpoint '{target.Endpoint}' failed: {ex.Message} - {body}"
+                    : $"Endpoint '{target.Endpoint}' failed: {ex.Message}";
+                return false;
             }
             catch (Exception ex)
             {
-                context.Fail("Failed to parse LLM response as JSON.", ex);
+                error = $"Endpoint '{target.Endpoint}' failed: {ex.Message}";
+                return false;
             }
+        }
+
+        private bool TryExtractContent(string json, out string content, out string error)
+        {
+            content = null;
+            error = null;
+
+            try
+            {
+                var root = MiniJson.Parse(json) as Dictionary<string, object>;
+                var choices = root?["choices"] as List<object>;
+                var firstChoice = choices?[0] as Dictionary<string, object>;
+                var message = firstChoice?["message"] as Dictionary<string, object>;
+                var text = message?["content"] as string;
+
+                if (string.IsNullOrEmpty(text))
+                {
+                    error = "response did not contain any message content";
+                    return false;
+                }
+
+                content = text;
+                return true;
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+                return false;
+            }
+        }
+
+        private string FinalizeContent(string content)
+        {
+            if (_config.StripReasoning)
+            {
+                content = ThinkTagRegex.Replace(content, string.Empty);
+            }
+
+            return content.Trim();
         }
 
         private static string ApplyPlaceholders(string template, string sourceLanguage, string destinationLanguage, string input)

@@ -11,6 +11,8 @@ only to a server you run yourself.
 ## Features
 
 - Works with any OpenAI-compatible `/v1/chat/completions` server (LM Studio, Ollama, etc.)
+- Optional fallback endpoint(s) — e.g. run LM Studio as primary and Ollama as fallback
+  (or two instances of either) — automatically tried in order if the primary fails
 - Optional API key (`Authorization: Bearer <key>`) for servers that require one
 - Fully configurable model name, temperature, top_p, and max tokens
 - Editable system prompt and user prompt template, with `{{SourceLanguage}}`,
@@ -57,6 +59,8 @@ for the full file with comments.
 | `Endpoint` | `http://localhost:1234/v1/chat/completions` | Chat-completions URL. LM Studio default shown; Ollama's OpenAI-compatible default is `http://localhost:11434/v1/chat/completions`. |
 | `ApiKey` | *(empty)* | Sent as `Authorization: Bearer <ApiKey>` when non-empty. |
 | `Model` | `local-model` | Model name/id exactly as your server expects it. |
+| `FallbackEndpoint` / `FallbackApiKey` / `FallbackModel` | *(empty)* | Optional fallback server, tried when the primary `Endpoint` fails (connection error, timeout, or non-200 response). Leave `FallbackEndpoint` empty to disable. Add more with numbered keys: `FallbackEndpoint2`, `FallbackApiKey2`, `FallbackModel2`, etc. (numbering must be contiguous). |
+| `FallbackTimeoutSeconds` | `60` | How long to wait for each fallback endpoint before giving up on it. |
 | `Temperature` | `0.3` | Sampling temperature. |
 | `TopP` | `1.0` | Nucleus sampling parameter. |
 | `MaxTokens` | `1000` | Max tokens in the completion. |
