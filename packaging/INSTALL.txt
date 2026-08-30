@@ -1,0 +1,21 @@
+XUnity.AutoTranslator.Plugin.LlmTranslateOffline - Installation
+=================================================================
+
+1. Copy LlmTranslateOffline.dll into:
+     BepInEx/plugins/XUnity.AutoTranslator/Translators/
+
+2. Copy LlmTranslateOffline.example.yaml into:
+     BepInEx/config/LlmTranslateOffline.yaml
+   (Optional: the plugin generates this file itself with the same defaults
+   the first time it runs, if it isn't already there.)
+
+3. In BepInEx/config/AutoTranslatorConfig.ini, under [Service], set:
+     Endpoint=LlmTranslateOffline
+
+4. Edit BepInEx/config/LlmTranslateOffline.yaml to point at your local
+   LM Studio or Ollama server, model name, and API key (if any).
+
+5. Make sure LM Studio / Ollama is running with its OpenAI-compatible API
+   server enabled, then launch the game.
+
+Full documentation: https://github.com/krakerz/XUnity.AutoTranslator.Plugin.LlmTranslateOffline

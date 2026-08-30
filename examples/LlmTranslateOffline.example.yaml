@@ -1,0 +1,41 @@
+# XUnity.AutoTranslator LLM Translate (Offline) endpoint configuration.
+# This is an example file. XUnity.AutoTranslator.Plugin.LlmTranslateOffline generates
+# BepInEx/config/LlmTranslateOffline.yaml automatically on first run with the same
+# structure and defaults shown here — you don't need to copy this file manually.
+# Edit the generated file and restart the game to apply changes.
+# To use this endpoint, set Endpoint=LlmTranslateOffline in AutoTranslatorConfig.ini.
+
+# Base URL of the OpenAI-compatible chat-completions endpoint.
+# LM Studio default:  http://localhost:1234/v1/chat/completions
+# Ollama (OpenAI-compatible) default: http://localhost:11434/v1/chat/completions
+Endpoint: http://localhost:1234/v1/chat/completions
+
+# API key sent as "Authorization: Bearer <ApiKey>". Leave empty if your server doesn't need one.
+ApiKey: ""
+
+# Model name/id exactly as your server expects it.
+Model: local-model
+
+# Sampling parameters passed to the LLM.
+Temperature: 0.3
+TopP: 1.0
+MaxTokens: 1000
+
+# Strip <think>...</think> blocks that some local reasoning models emit.
+StripReasoning: true
+
+# Leave empty to use the SourceLanguage/DestinationLanguage from AutoTranslatorConfig.ini.
+# Set these to override the language pair just for this endpoint.
+SourceLanguage: ""
+DestinationLanguage: "english"
+
+# System prompt sent as the "system" role message.
+# Placeholders: {{SourceLanguage}}, {{DestinationLanguage}}
+SystemPrompt: |
+  You are a translation engine. Translate the given text from {{SourceLanguage}} to {{DestinationLanguage}}.
+  Only output the translated text, with no explanations, notes, quotes or extra formatting.
+
+# User prompt template sent as the "user" role message.
+# Placeholders: {{SourceLanguage}}, {{DestinationLanguage}}, {{Input}}
+UserPromptTemplate: |
+  {{Input}}
