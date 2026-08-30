@@ -5,6 +5,35 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-08-30
+
+### Changed (Breaking)
+
+- Renamed the secondary-endpoint config keys again: `SecondaryEndpoint` / `SecondaryApiKey` /
+  `SecondaryModel` / `SecondaryEndpoint2` (etc.) / `SecondaryTimeoutSeconds` are now
+  `AlternativeEndpoint` / `AlternativeApiKey` / `AlternativeModel` / `AlternativeEndpoint2` (etc.) /
+  `AlternativeTimeoutSeconds`. If you're upgrading from 2.0.0 and were using the `Secondary*`
+  keys, rename them in your existing `BepInEx/config/LlmTranslateOffline.yaml` — the old
+  names are no longer read.
+
+## [2.0.0] - 2026-08-30
+
+### Changed (Breaking)
+
+- Renamed the secondary-endpoint config keys: `FallbackEndpoint` / `FallbackApiKey` /
+  `FallbackModel` / `FallbackEndpoint2` (etc.) / `FallbackTimeoutSeconds` are now
+  `SecondaryEndpoint` / `SecondaryApiKey` / `SecondaryModel` / `SecondaryEndpoint2` (etc.) /
+  `SecondaryTimeoutSeconds`. This avoids confusion with `AutoTranslatorConfig.ini`'s own,
+  unrelated `FallbackEndpoint` setting (which switches to a completely different translator
+  service, e.g. `FallbackEndpoint=GoogleTranslateV2`). If you're upgrading from 1.2.0 and
+  were using the old `Fallback*` keys, rename them in your existing
+  `BepInEx/config/LlmTranslateOffline.yaml` — the old names are no longer read.
+
+### Added
+
+- Logs a confirmation line to BepInEx's `LogOutput.log` when the plugin initializes:
+  version, primary endpoint/model, and number of secondary endpoints configured.
+
 ## [1.2.0] - 2026-08-30
 
 ### Added

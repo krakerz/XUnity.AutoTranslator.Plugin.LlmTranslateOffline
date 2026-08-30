@@ -17,14 +17,14 @@ namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline.Config
     {
         public const string FileName = "LlmTranslateOffline.yaml";
 
-        // Highest number of numbered "FallbackEndpointN" entries that will be read from the file.
-        private const int MaxFallbacks = 5;
+        // Highest number of numbered "AlternativeEndpointN" entries that will be read from the file.
+        private const int MaxAlternatives = 5;
 
         public string Endpoint;
         public string ApiKey;
         public string Model;
-        public List<LlmEndpointTarget> Fallbacks;
-        public int FallbackTimeoutSeconds;
+        public List<LlmEndpointTarget> Alternatives;
+        public int AlternativeTimeoutSeconds;
         public float Temperature;
         public float TopP;
         public int MaxTokens;
@@ -59,8 +59,8 @@ namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline.Config
                 Endpoint = GetString(raw, "Endpoint", "http://localhost:1234/v1/chat/completions"),
                 ApiKey = GetString(raw, "ApiKey", ""),
                 Model = GetString(raw, "Model", "local-model"),
-                Fallbacks = ParseFallbacks(raw),
-                FallbackTimeoutSeconds = GetInt(raw, "FallbackTimeoutSeconds", 60),
+                Alternatives = ParseAlternatives(raw),
+                AlternativeTimeoutSeconds = GetInt(raw, "AlternativeTimeoutSeconds", 60),
                 Temperature = GetFloat(raw, "Temperature", 0.3f),
                 TopP = GetFloat(raw, "TopP", 1.0f),
                 MaxTokens = GetInt(raw, "MaxTokens", 1000),
@@ -72,31 +72,33 @@ namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline.Config
             };
         }
 
-        // Reads FallbackEndpoint/FallbackApiKey/FallbackModel, then FallbackEndpoint2/... up to
-        // MaxFallbacks. Stops at the first missing FallbackEndpointN so numbering must be contiguous.
-        private static List<LlmEndpointTarget> ParseFallbacks(Dictionary<string, string> raw)
+        // Reads AlternativeEndpoint/AlternativeApiKey/AlternativeModel, then AlternativeEndpoint2/... up to
+        // MaxAlternatives. Stops at the first missing AlternativeEndpointN so numbering must be contiguous.
+        // Named "Alternative" (not "Fallback") to avoid confusion with AutoTranslatorConfig.ini's own,
+        // unrelated FallbackEndpoint setting (which switches to a different translator service entirely).
+        private static List<LlmEndpointTarget> ParseAlternatives(Dictionary<string, string> raw)
         {
             var defaultModel = GetString(raw, "Model", "local-model");
-            var fallbacks = new List<LlmEndpointTarget>();
+            var alternatives = new List<LlmEndpointTarget>();
 
-            for (var i = 1; i <= MaxFallbacks; i++)
+            for (var i = 1; i <= MaxAlternatives; i++)
             {
                 var suffix = i == 1 ? "" : i.ToString(CultureInfo.InvariantCulture);
-                if (!raw.TryGetValue("FallbackEndpoint" + suffix, out var endpoint) || string.IsNullOrWhiteSpace(endpoint))
+                if (!raw.TryGetValue("AlternativeEndpoint" + suffix, out var endpoint) || string.IsNullOrWhiteSpace(endpoint))
                 {
                     break;
                 }
 
-                var model = GetString(raw, "FallbackModel" + suffix, "");
-                fallbacks.Add(new LlmEndpointTarget
+                var model = GetString(raw, "AlternativeModel" + suffix, "");
+                alternatives.Add(new LlmEndpointTarget
                 {
                     Endpoint = endpoint,
-                    ApiKey = GetString(raw, "FallbackApiKey" + suffix, ""),
+                    ApiKey = GetString(raw, "AlternativeApiKey" + suffix, ""),
                     Model = string.IsNullOrEmpty(model) ? defaultModel : model,
                 });
             }
 
-            return fallbacks;
+            return alternatives;
         }
 
         private const string DefaultSystemPrompt =
@@ -123,25 +125,29 @@ namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline.Config
                 "# Model name/id exactly as your server expects it.\n" +
                 "Model: local-model\n" +
                 "\n" +
-                "# --- Fallback endpoint(s) (optional) ---\n" +
+                "# --- Alternative endpoint(s) (optional) ---\n" +
                 "# If the primary Endpoint above fails (connection error, timeout, or a non-200\n" +
-                "# response), this plugin retries the same request against each fallback below, in\n" +
-                "# order, using the same prompts and sampling settings. Leave FallbackEndpoint empty\n" +
+                "# response), this plugin retries the same request against each alternative below, in\n" +
+                "# order, using the same prompts and sampling settings. Leave AlternativeEndpoint empty\n" +
                 "# (default) to disable this and only ever use the primary endpoint.\n" +
                 "#\n" +
-                "# Example: LM Studio as primary, Ollama as fallback (or the other way around,\n" +
+                "# Named \"Alternative\", not \"Fallback\", so it isn't confused with AutoTranslatorConfig.ini's\n" +
+                "# own FallbackEndpoint setting, which is a different, unrelated feature (it switches to a\n" +
+                "# completely different translator service, e.g. FallbackEndpoint=GoogleTranslateV2).\n" +
+                "#\n" +
+                "# Example: LM Studio as primary, Ollama as alternative (or the other way around,\n" +
                 "# or two LM Studio/Ollama instances on different ports).\n" +
-                "FallbackEndpoint: \"\"\n" +
-                "FallbackApiKey: \"\"\n" +
-                "FallbackModel: \"\"\n" +
+                "AlternativeEndpoint: \"\"\n" +
+                "AlternativeApiKey: \"\"\n" +
+                "AlternativeModel: \"\"\n" +
                 "\n" +
-                "# Add more fallbacks by numbering the keys (tried in order after FallbackEndpoint):\n" +
-                "# FallbackEndpoint2: http://localhost:11434/v1/chat/completions\n" +
-                "# FallbackApiKey2: \"\"\n" +
-                "# FallbackModel2: llama3\n" +
+                "# Add more alternatives by numbering the keys (tried in order after AlternativeEndpoint):\n" +
+                "# AlternativeEndpoint2: http://localhost:11434/v1/chat/completions\n" +
+                "# AlternativeApiKey2: \"\"\n" +
+                "# AlternativeModel2: llama3\n" +
                 "\n" +
-                "# How long to wait (in seconds) for a fallback endpoint to respond before giving up on it.\n" +
-                "FallbackTimeoutSeconds: 60\n" +
+                "# How long to wait (in seconds) for an alternative endpoint to respond before giving up on it.\n" +
+                "AlternativeTimeoutSeconds: 60\n" +
                 "\n" +
                 "# Sampling parameters passed to the LLM.\n" +
                 "Temperature: 0.3\n" +
