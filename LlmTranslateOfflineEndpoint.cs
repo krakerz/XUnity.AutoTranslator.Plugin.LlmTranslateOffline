@@ -9,6 +9,7 @@ using XUnity.AutoTranslator.Plugin.Core.Endpoints.Http;
 using XUnity.AutoTranslator.Plugin.Core.Web;
 using XUnity.AutoTranslator.Plugin.LlmTranslateOffline.Config;
 using XUnity.AutoTranslator.Plugin.LlmTranslateOffline.Json;
+using XUnity.Common.Logging;
 
 namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline
 {
@@ -32,6 +33,11 @@ namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline
         {
             var path = LlmConfig.ResolvePath(context.TranslatorDirectory);
             _config = LlmConfig.LoadOrCreate(path);
+
+            var version = GetType().Assembly.GetName().Version;
+            XuaLogger.AutoTranslator.Info(
+                $"LlmTranslateOffline v{version} loaded. Primary endpoint: {_config.Endpoint} (model: {_config.Model}). " +
+                $"Alternative endpoints configured: {_config.Alternatives.Count}.");
         }
 
         public override void OnCreateRequest(IHttpRequestCreationContext context)
@@ -56,7 +62,7 @@ namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline
                 ? $"Endpoint '{_config.Endpoint}' returned an unparsable response: {parseError}"
                 : $"Endpoint '{_config.Endpoint}' returned HTTP {(int)response.Code}: {response.Data}";
 
-            if (_config.Fallbacks.Count == 0)
+            if (_config.Alternatives.Count == 0)
             {
                 context.Fail(primaryError, null);
                 return;
@@ -65,15 +71,15 @@ namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline
             var (systemPrompt, userPrompt) = BuildPrompts(context);
             var errors = new List<string> { primaryError };
 
-            foreach (var fallback in _config.Fallbacks)
+            foreach (var alternative in _config.Alternatives)
             {
-                if (TrySendSync(fallback, systemPrompt, userPrompt, out var fallbackContent, out var fallbackError))
+                if (TrySendSync(alternative, systemPrompt, userPrompt, out var alternativeContent, out var alternativeError))
                 {
-                    context.Complete(FinalizeContent(fallbackContent));
+                    context.Complete(FinalizeContent(alternativeContent));
                     return;
                 }
 
-                errors.Add(fallbackError);
+                errors.Add(alternativeError);
             }
 
             context.Fail("All LLM endpoints failed:\n" + string.Join("\n", errors), null);
@@ -127,7 +133,7 @@ namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline
             return request;
         }
 
-        // Synchronously calls a fallback endpoint. Safe to block here: this endpoint's
+        // Synchronously calls an alternative endpoint. Safe to block here: this endpoint's
         // MaxConcurrency is 1, and the framework already runs HTTP work off the main thread.
         private bool TrySendSync(LlmEndpointTarget target, string systemPrompt, string userPrompt, out string content, out string error)
         {
@@ -139,7 +145,7 @@ namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline
                 var webRequest = (HttpWebRequest)WebRequest.Create(target.Endpoint);
                 webRequest.Method = "POST";
                 webRequest.ContentType = "application/json";
-                webRequest.Timeout = Math.Max(1, _config.FallbackTimeoutSeconds) * 1000;
+                webRequest.Timeout = Math.Max(1, _config.AlternativeTimeoutSeconds) * 1000;
                 if (!string.IsNullOrEmpty(target.ApiKey))
                 {
                     webRequest.Headers[HttpRequestHeader.Authorization] = "Bearer " + target.ApiKey;

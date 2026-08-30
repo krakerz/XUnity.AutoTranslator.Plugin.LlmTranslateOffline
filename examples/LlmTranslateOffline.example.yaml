@@ -16,25 +16,29 @@ ApiKey: ""
 # Model name/id exactly as your server expects it.
 Model: local-model
 
-# --- Fallback endpoint(s) (optional) ---
+# --- Alternative endpoint(s) (optional) ---
 # If the primary Endpoint above fails (connection error, timeout, or a non-200
-# response), this plugin retries the same request against each fallback below, in
-# order, using the same prompts and sampling settings. Leave FallbackEndpoint empty
+# response), this plugin retries the same request against each alternative below, in
+# order, using the same prompts and sampling settings. Leave AlternativeEndpoint empty
 # (default) to disable this and only ever use the primary endpoint.
 #
-# Example: LM Studio as primary, Ollama as fallback (or the other way around,
+# Named "Alternative", not "Fallback", so it isn't confused with AutoTranslatorConfig.ini's
+# own FallbackEndpoint setting, which is a different, unrelated feature (it switches to a
+# completely different translator service, e.g. FallbackEndpoint=GoogleTranslateV2).
+#
+# Example: LM Studio as primary, Ollama as alternative (or the other way around,
 # or two LM Studio/Ollama instances on different ports).
-FallbackEndpoint: ""
-FallbackApiKey: ""
-FallbackModel: ""
+AlternativeEndpoint: ""
+AlternativeApiKey: ""
+AlternativeModel: ""
 
-# Add more fallbacks by numbering the keys (tried in order after FallbackEndpoint):
-# FallbackEndpoint2: http://localhost:11434/v1/chat/completions
-# FallbackApiKey2: ""
-# FallbackModel2: llama3
+# Add more alternatives by numbering the keys (tried in order after AlternativeEndpoint):
+# AlternativeEndpoint2: http://localhost:11434/v1/chat/completions
+# AlternativeApiKey2: ""
+# AlternativeModel2: llama3
 
-# How long to wait (in seconds) for a fallback endpoint to respond before giving up on it.
-FallbackTimeoutSeconds: 60
+# How long to wait (in seconds) for an alternative endpoint to respond before giving up on it.
+AlternativeTimeoutSeconds: 60
 
 # Sampling parameters passed to the LLM.
 Temperature: 0.3

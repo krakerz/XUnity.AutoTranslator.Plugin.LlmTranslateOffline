@@ -8,12 +8,16 @@
     <RootNamespace>XUnity.AutoTranslator.Plugin.LlmTranslateOffline</RootNamespace>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
-    <Version>1.2.0</Version>
+    <Version>2.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
     <Reference Include="XUnity.AutoTranslator.Plugin.Core">
       <HintPath>libs/XUnity.AutoTranslator.Plugin.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="XUnity.Common">
+      <HintPath>libs/XUnity.Common.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
