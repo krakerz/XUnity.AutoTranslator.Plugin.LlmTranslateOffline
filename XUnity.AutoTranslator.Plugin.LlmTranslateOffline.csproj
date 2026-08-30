@@ -7,8 +7,8 @@
     <AssemblyName>XUnity.AutoTranslator.Plugin.LlmTranslateOffline</AssemblyName>
     <RootNamespace>XUnity.AutoTranslator.Plugin.LlmTranslateOffline</RootNamespace>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <Version>1.0.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
