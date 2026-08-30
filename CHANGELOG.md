@@ -5,6 +5,15 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-08-30
+
+### Changed
+
+- Fixed the example config (`examples/LlmTranslateOffline.example.yaml`): reverted
+  `DestinationLanguage` to its correct empty default. It's an optional per-endpoint
+  override of `AutoTranslatorConfig.ini`'s `Language`/`FromLanguage`, not a required
+  field, and the example previously showed it set to `"english"`.
+
 ## [1.0.0] - 2026-08-30
 
 ### Added

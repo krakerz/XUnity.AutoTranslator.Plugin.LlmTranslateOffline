@@ -27,7 +27,7 @@ StripReasoning: true
 # Leave empty to use the SourceLanguage/DestinationLanguage from AutoTranslatorConfig.ini.
 # Set these to override the language pair just for this endpoint.
 SourceLanguage: ""
-DestinationLanguage: "english"
+DestinationLanguage: ""
 
 # System prompt sent as the "system" role message.
 # Placeholders: {{SourceLanguage}}, {{DestinationLanguage}}
