@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- Optional fallback endpoint(s): `FallbackEndpoint` / `FallbackApiKey` / `FallbackModel`
+  (and numbered `FallbackEndpoint2`, etc. for more than one), plus `FallbackTimeoutSeconds`.
+  When the primary `Endpoint` fails (connection error, timeout, or non-200 response),
+  each fallback is tried in order using the same prompts and sampling settings — e.g.
+  LM Studio as primary and Ollama as fallback, or two instances of either.
+
 ## [1.1.0] - 2026-08-30
 
 ### Changed
