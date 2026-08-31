@@ -85,6 +85,58 @@ dotnet build -c Release
 
 The output DLL is written to `bin/Release/XUnity.AutoTranslator.Plugin.LlmTranslateOffline.dll`.
 
+## FAQ
+
+**Does this send my game's text to a cloud service?**
+No. It only talks to a server you run yourself, at whatever address you put in `Endpoint`.
+There is no hosted provider in the code and no telemetry.
+
+**Which model should I use?**
+Anything instruction-following that fits in your VRAM. Translation quality matters more
+than raw size, so a model with good coverage of your target language usually beats a
+larger general one. Lower `Temperature` (the `0.3` default) keeps output stable.
+
+**Nothing is being translated. Where do I look first?**
+`BepInEx/LogOutput.log`. The plugin logs a line on load with its version, primary
+endpoint/model, and alternative count. If that line is missing, the DLL is not in
+`BepInEx/plugins/XUnity.AutoTranslator/Translators/` or `Endpoint=LlmTranslateOffline` is
+not set in `AutoTranslatorConfig.ini`. If it is present, the problem is the server or the
+config values.
+
+**I upgraded and my alternative endpoint stopped working.**
+The config keys were renamed. `Fallback*` (1.2.0) became `Secondary*` (2.0.0) and then
+`Alternative*` (2.1.0). Old names are not read and produce no warning — rename them in
+`BepInEx/config/LlmTranslateOffline.yaml`.
+
+**Can I edit the prompt?**
+Yes. `SystemPrompt` and `UserPromptTemplate` are plain YAML block scalars in the config,
+with `{{SourceLanguage}}`, `{{DestinationLanguage}}` and `{{Input}}` placeholders. Restart
+the game to apply.
+
+**My model outputs its reasoning along with the translation.**
+`StripReasoning` (on by default) removes `<think>...</think>` blocks. If your model uses a
+different marker, it will come through — adjust `SystemPrompt` to suppress it.
+
+**Do I need Windows to build this?**
+No. `dotnet build -c Release` works on Linux, macOS and Windows.
+
+## Limitations
+
+- **Config changes need a game restart.** There is no hot reload.
+- **One request at a time.** Concurrency is fixed at 1, so bulk translation of a
+  text-heavy scene is bounded by your model's throughput.
+- **No retry on a single endpoint.** Each alternative is tried once, in order. A server
+  that is still loading a model returns an error and is skipped rather than retried.
+- **Primary endpoint timeout is not configurable.** `AlternativeTimeoutSeconds` applies
+  only to alternatives; the primary request uses XUnity.AutoTranslator's own timeout.
+- **No streaming.** The full completion is awaited before any text is returned.
+- **Prompts are global.** `SystemPrompt` / `UserPromptTemplate` apply to the primary and
+  every alternative; they cannot be set per endpoint.
+- **Config keys were renamed twice** across 1.2.0 → 2.0.0 → 2.1.0, with no back-compat
+  shim for the old `Fallback*` / `Secondary*` names.
+- **Tested on Mono games only.** IL2CPP / BepInEx 6 is unverified.
+- Translation quality is entirely your local model's. This plugin only transports text.
+
 ## Versioning & Changelog
 
 This project follows [Semantic Versioning](https://semver.org/). See
@@ -96,4 +148,8 @@ MIT — see [`LICENSE`](LICENSE).
 
 ---
 
-**Note:** This project's code, CI, and documentation were developed with the help of AI (Claude).
+### Notes
+
+- Releases are drafted automatically by CI on every push to `main`; the release body is
+  the matching `CHANGELOG.md` section.
+- This project's code, CI, and documentation were developed with the help of AI (Claude).
