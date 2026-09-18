@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 using XUnity.AutoTranslator.Plugin.Core.Endpoints;
@@ -13,15 +14,19 @@ using XUnity.Common.Logging;
 
 namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline
 {
-    // Translation endpoint that sends text to any OpenAI-chat-completions-compatible
-    // server running locally (LM Studio, Ollama's "/v1/chat/completions" surface, etc.)
-    // for translation. Offline-only by design: no cloud/hosted endpoints.
-    // All settings live in BepInEx/config/LlmTranslateOffline.yaml, generated on first run.
     public class LlmTranslateOfflineEndpoint : HttpEndpoint
     {
         private static readonly Regex ThinkTagRegex = new Regex("<think>.*?</think>", RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
+        // Short TCP-connect timeout used only to pick which target OnCreateRequest hands to
+        // the framework — not the real request timeout (see AlternativeTimeoutSeconds).
+        private const int PreflightTimeoutMs = 800;
+
         private LlmConfig _config;
+
+        // The target actually handed to the framework for the request currently in flight.
+        // Safe as instance state: MaxConcurrency is 1, so only one request is ever in flight.
+        private LlmEndpointTarget _attemptedTarget;
 
         public override string Id => "LlmTranslateOffline";
 
@@ -65,10 +70,60 @@ namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline
 
         public override void OnCreateRequest(IHttpRequestCreationContext context)
         {
-            var primary = new LlmEndpointTarget { Endpoint = _config.Endpoint, ApiKey = _config.ApiKey, Model = _config.Model };
             var (systemPrompt, userPrompt) = BuildPrompts(context);
 
-            context.Complete(BuildRequest(primary, systemPrompt, userPrompt));
+            // A connection-level failure (refused/unreachable) throws inside the framework's
+            // own request pipeline, before OnExtractTranslation is ever called — so the
+            // alternative-endpoint failover below never gets a chance to run for that case.
+            // Picking a reachable target up front (a cheap TCP probe, not a full request)
+            // covers that gap; OnExtractTranslation still handles "got a response but it's bad".
+            _attemptedTarget = ChooseReachableTarget();
+
+            context.Complete(BuildRequest(_attemptedTarget, systemPrompt, userPrompt));
+        }
+
+        private LlmEndpointTarget ChooseReachableTarget()
+        {
+            var primary = new LlmEndpointTarget { Endpoint = _config.Endpoint, ApiKey = _config.ApiKey, Model = _config.Model };
+            if (IsTcpReachable(primary.Endpoint))
+            {
+                return primary;
+            }
+
+            foreach (var alternative in _config.Alternatives)
+            {
+                if (IsTcpReachable(alternative.Endpoint))
+                {
+                    return alternative;
+                }
+            }
+
+            // Nothing reachable: use primary anyway so the normal error-reporting path below
+            // still produces a clean, aggregated failure instead of no target at all.
+            return primary;
+        }
+
+        private static bool IsTcpReachable(string url)
+        {
+            try
+            {
+                var uri = new Uri(url);
+                using (var client = new TcpClient())
+                {
+                    var result = client.BeginConnect(uri.Host, uri.Port, null, null);
+                    if (!result.AsyncWaitHandle.WaitOne(PreflightTimeoutMs))
+                    {
+                        return false;
+                    }
+
+                    client.EndConnect(result);
+                    return true;
+                }
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public override void OnExtractTranslation(IHttpTranslationExtractionContext context)
@@ -81,31 +136,61 @@ namespace XUnity.AutoTranslator.Plugin.LlmTranslateOffline
                 return;
             }
 
-            var primaryError = response.Code == HttpStatusCode.OK
-                ? $"Endpoint '{_config.Endpoint}' returned an unparsable response: {parseError}"
-                : $"Endpoint '{_config.Endpoint}' returned HTTP {(int)response.Code}: {response.Data}";
+            var attemptedError = response.Code == HttpStatusCode.OK
+                ? $"Endpoint '{_attemptedTarget.Endpoint}' returned an unparsable response: {parseError}"
+                : $"Endpoint '{_attemptedTarget.Endpoint}' returned HTTP {(int)response.Code}: {response.Data}";
 
-            if (_config.Alternatives.Count == 0)
+            var remaining = RemainingCandidates();
+            if (remaining.Count == 0)
             {
-                context.Fail(primaryError, null);
+                context.Fail(attemptedError, null);
                 return;
             }
 
             var (systemPrompt, userPrompt) = BuildPrompts(context);
-            var errors = new List<string> { primaryError };
+            var errors = new List<string> { attemptedError };
 
-            foreach (var alternative in _config.Alternatives)
+            foreach (var candidate in remaining)
             {
-                if (TrySendSync(alternative, systemPrompt, userPrompt, out var alternativeContent, out var alternativeError))
+                if (TrySendSync(candidate, systemPrompt, userPrompt, out var candidateContent, out var candidateError))
                 {
-                    context.Complete(FinalizeContent(alternativeContent));
+                    context.Complete(FinalizeContent(candidateContent));
                     return;
                 }
 
-                errors.Add(alternativeError);
+                errors.Add(candidateError);
             }
 
             context.Fail("All LLM endpoints failed:\n" + string.Join("\n", errors), null);
+        }
+
+        // Every configured target except whichever one OnCreateRequest already attempted
+        // (ChooseReachableTarget may have already picked an alternative as the effective
+        // primary, so this isn't always just "all the alternatives").
+        private List<LlmEndpointTarget> RemainingCandidates()
+        {
+            var candidates = new List<LlmEndpointTarget>();
+
+            var configuredPrimary = new LlmEndpointTarget { Endpoint = _config.Endpoint, ApiKey = _config.ApiKey, Model = _config.Model };
+            if (!SameEndpoint(configuredPrimary, _attemptedTarget))
+            {
+                candidates.Add(configuredPrimary);
+            }
+
+            foreach (var alternative in _config.Alternatives)
+            {
+                if (!SameEndpoint(alternative, _attemptedTarget))
+                {
+                    candidates.Add(alternative);
+                }
+            }
+
+            return candidates;
+        }
+
+        private static bool SameEndpoint(LlmEndpointTarget a, LlmEndpointTarget b)
+        {
+            return string.Equals(a.Endpoint, b.Endpoint, StringComparison.OrdinalIgnoreCase);
         }
 
         private (string systemPrompt, string userPrompt) BuildPrompts(ITranslationContextBase context)

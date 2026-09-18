@@ -1,12 +1,12 @@
-name: Build & draft release
+name: Build
 
 on:
-  pull_request:
+  push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: write
-  pull-requests: read
 
 env:
   PROJECT_FILE: XUnity.AutoTranslator.Plugin.LlmTranslateOffline.csproj
@@ -29,57 +29,47 @@ jobs:
         with:
           path: ~/.nuget/packages
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
+          restore-keys: ${{ runner.os }}-nuget-
 
       - name: Read version
         id: version
         run: |
           VERSION=$(grep -oPm1 '(?<=<Version>)[^<]+' "$PROJECT_FILE")
           if [ -z "$VERSION" ]; then
-            echo "Could not read <Version> from $PROJECT_FILE" >&2
+            echo "::error::Could not read <Version> from $PROJECT_FILE" >&2
             exit 1
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Build
-        run: dotnet build -c Release "$PROJECT_FILE"
-
-      - name: Extract changelog section for this version
+      - name: Extract changelog section
         run: |
           awk -v ver="${{ steps.version.outputs.version }}" '
-            /^## \[/ {
-              if (found) exit
-              if (index($0, "[" ver "]") > 0) { found=1; next }
-              next
-            }
-            found { print }
+            /^## \[/ { if (f) exit; if (index($0, "[" ver "]") > 0) { f=1 }; next }
+            f { print }
           ' CHANGELOG.md > release_notes.md
 
           if [ ! -s release_notes.md ]; then
-            echo "No changelog section found for version ${{ steps.version.outputs.version }}." > release_notes.md
+            echo "::error::CHANGELOG.md has no section for version ${{ steps.version.outputs.version }}. Add one before pushing to main." >&2
+            exit 1
           fi
+
+      - name: Build
+        run: dotnet build -c Release "$PROJECT_FILE"
 
       - name: Stage release bundle
         run: |
           STAGE=staging/LlmTranslateOffline
           mkdir -p "$STAGE"
-          cp "bin/Release/XUnity.AutoTranslator.Plugin.LlmTranslateOffline.dll" "$STAGE/"
-          cp "examples/LlmTranslateOffline.example.yaml" "$STAGE/"
-          cp "packaging/INSTALL.txt" "$STAGE/"
+          cp bin/Release/XUnity.AutoTranslator.Plugin.LlmTranslateOffline.dll "$STAGE/"
+          cp examples/LlmTranslateOffline.example.yaml "$STAGE/"
+          cp packaging/INSTALL.txt "$STAGE/"
           (cd staging && zip -r "../LlmTranslateOffline-v${{ steps.version.outputs.version }}.zip" LlmTranslateOffline)
 
-      - name: Build unique release tag
-        id: tag
-        run: |
-          TAG="v${{ steps.version.outputs.version }}-pr${{ github.event.pull_request.number }}.${{ github.run_number }}"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-
-      - name: Create draft release
+      - name: Draft release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: "v${{ steps.version.outputs.version }} (PR #${{ github.event.pull_request.number }}, build ${{ github.run_number }})"
-          body_path: release_notes.md
           draft: true
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          body_path: release_notes.md
           files: LlmTranslateOffline-v${{ steps.version.outputs.version }}.zip

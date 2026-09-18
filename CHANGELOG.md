@@ -1,81 +1,85 @@
 # Changelog
 
-All notable changes to this project are documented in this file.
+All notable changes to this project are documented in this file. The format is based on
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/).
+## [Unreleased]
 
-## [2.1.1] - 2026-08-30
+## [2.1.2] — 2026-09-18
+
+### Fixed
+
+- Alternative endpoints were never tried when the primary was completely unreachable
+  (connection refused / host down) — that failure happens inside XUnity.AutoTranslator's
+  own request pipeline before this plugin's failover code ever runs, and repeated failures
+  could trip XUnity's own consecutive-error limit and shut the endpoint down entirely.
+  `OnCreateRequest` now probes each target with a short TCP connect and hands the framework
+  whichever one answers first, primary first. A target that connects but returns a bad
+  response is still handled by the existing failover in `OnExtractTranslation`.
+
+## [2.1.1] — 2026-08-30
 
 ### Fixed
 
 - Worked around a Mono-on-Wine bug where the first `WebRequest`/`WebClient` call in the
-  process throws `NullReferenceException` from
-  `System.Net.AutoWebProxyScriptEngine.InitializeRegistryGlobalProxy` while trying to read
-  proxy settings from the (nonexistent) Windows registry. This crashed both
-  XUnity.AutoTranslator's own primary request pipeline and this plugin's alternative-endpoint
-  `HttpWebRequest` calls, so failover never had a chance to run. Fixed by explicitly setting
+  process threw `NullReferenceException` from
+  `System.Net.AutoWebProxyScriptEngine.InitializeRegistryGlobalProxy` while reading proxy
+  settings from the (nonexistent) Windows registry — crashing XUnity.AutoTranslator's own
+  pipeline before any translation, alternatives included. Fixed by setting
   `WebRequest.DefaultWebProxy = null` once, early in `Initialize()`.
 
-## [2.1.0] - 2026-08-30
+## [2.1.0] — 2026-08-30
 
 ### Changed (Breaking)
 
-- Renamed the secondary-endpoint config keys again: `SecondaryEndpoint` / `SecondaryApiKey` /
-  `SecondaryModel` / `SecondaryEndpoint2` (etc.) / `SecondaryTimeoutSeconds` are now
-  `AlternativeEndpoint` / `AlternativeApiKey` / `AlternativeModel` / `AlternativeEndpoint2` (etc.) /
-  `AlternativeTimeoutSeconds`. If you're upgrading from 2.0.0 and were using the `Secondary*`
-  keys, rename them in your existing `BepInEx/config/LlmTranslateOffline.yaml` — the old
+- `SecondaryEndpoint` / `SecondaryApiKey` / `SecondaryModel` / `SecondaryEndpoint2` (etc.) /
+  `SecondaryTimeoutSeconds` are now `AlternativeEndpoint` / `AlternativeApiKey` /
+  `AlternativeModel` / `AlternativeEndpoint2` (etc.) / `AlternativeTimeoutSeconds`. Old
   names are no longer read.
 
-## [2.0.0] - 2026-08-30
+## [2.0.0] — 2026-08-30
 
 ### Changed (Breaking)
 
-- Renamed the secondary-endpoint config keys: `FallbackEndpoint` / `FallbackApiKey` /
-  `FallbackModel` / `FallbackEndpoint2` (etc.) / `FallbackTimeoutSeconds` are now
-  `SecondaryEndpoint` / `SecondaryApiKey` / `SecondaryModel` / `SecondaryEndpoint2` (etc.) /
-  `SecondaryTimeoutSeconds`. This avoids confusion with `AutoTranslatorConfig.ini`'s own,
-  unrelated `FallbackEndpoint` setting (which switches to a completely different translator
-  service, e.g. `FallbackEndpoint=GoogleTranslateV2`). If you're upgrading from 1.2.0 and
-  were using the old `Fallback*` keys, rename them in your existing
-  `BepInEx/config/LlmTranslateOffline.yaml` — the old names are no longer read.
+- `FallbackEndpoint` / `FallbackApiKey` / `FallbackModel` / `FallbackEndpoint2` (etc.) /
+  `FallbackTimeoutSeconds` are now `SecondaryEndpoint` / `SecondaryApiKey` /
+  `SecondaryModel` / `SecondaryEndpoint2` (etc.) / `SecondaryTimeoutSeconds` — avoids
+  colliding with `AutoTranslatorConfig.ini`'s own unrelated `FallbackEndpoint` setting,
+  which switches to an entirely different translator service (e.g.
+  `FallbackEndpoint=GoogleTranslateV2`). Old names are no longer read.
 
 ### Added
 
-- Logs a confirmation line to BepInEx's `LogOutput.log` when the plugin initializes:
-  version, primary endpoint/model, and number of secondary endpoints configured.
+- Logs a confirmation line to BepInEx's `LogOutput.log` on initialization: version,
+  primary endpoint/model, and number of secondary endpoints configured.
 
-## [1.2.0] - 2026-08-30
+## [1.2.0] — 2026-08-30
 
 ### Added
 
 - Optional fallback endpoint(s): `FallbackEndpoint` / `FallbackApiKey` / `FallbackModel`
-  (and numbered `FallbackEndpoint2`, etc. for more than one), plus `FallbackTimeoutSeconds`.
-  When the primary `Endpoint` fails (connection error, timeout, or non-200 response),
-  each fallback is tried in order using the same prompts and sampling settings — e.g.
-  LM Studio as primary and Ollama as fallback, or two instances of either.
+  (and numbered `FallbackEndpoint2`, etc. for more than one), plus
+  `FallbackTimeoutSeconds`. Triggered by connection error, timeout, or non-200 response,
+  tried in order using the same prompts and sampling settings.
 
-## [1.1.0] - 2026-08-30
+## [1.1.0] — 2026-08-30
 
 ### Changed
 
-- Fixed the example config (`examples/LlmTranslateOffline.example.yaml`): reverted
-  `DestinationLanguage` to its correct empty default. It's an optional per-endpoint
-  override of `AutoTranslatorConfig.ini`'s `Language`/`FromLanguage`, not a required
-  field, and the example previously showed it set to `"english"`.
+- `examples/LlmTranslateOffline.example.yaml`: reverted `DestinationLanguage` to its
+  correct empty default. It's an optional per-endpoint override of
+  `AutoTranslatorConfig.ini`'s `Language`/`FromLanguage`, not a required field.
 
-## [1.0.0] - 2026-08-30
+## [1.0.0] — 2026-08-30
 
 ### Added
 
-- Initial release: an XUnity.AutoTranslator translation endpoint (`LlmTranslateOffline`)
-  that talks to any locally-hosted OpenAI-compatible chat-completions server (LM Studio,
-  Ollama's OpenAI-compatible surface, etc.) — no cloud/hosted LLM endpoints.
-- All settings live in an auto-generated `BepInEx/config/LlmTranslateOffline.yaml`:
-  endpoint URL, API key, model, sampling parameters (temperature/top_p/max tokens),
-  optional per-endpoint source/destination language override, and fully editable
-  system prompt / user prompt template (multi-line YAML block scalars).
+- `LlmTranslateOffline` endpoint for locally-hosted OpenAI-compatible chat-completions
+  servers (LM Studio, Ollama's OpenAI-compatible surface, etc.). Offline-only by design.
+- Auto-generated `BepInEx/config/LlmTranslateOffline.yaml`: endpoint URL, API key, model,
+  sampling parameters (temperature/top_p/max tokens), optional per-endpoint
+  source/destination language override, and fully editable system/user prompt templates.
 - Optional stripping of `<think>...</think>` blocks emitted by local reasoning models.
-- No third-party runtime dependencies — JSON and the config file's YAML subset are
-  parsed with small self-contained implementations bundled in the DLL.
+- No third-party runtime dependencies — JSON and YAML are hand-rolled and bundled in the
+  DLL.
