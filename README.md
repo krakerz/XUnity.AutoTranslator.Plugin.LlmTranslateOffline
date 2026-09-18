@@ -11,8 +11,8 @@ only to a server you run yourself.
 ## Features
 
 - Works with any OpenAI-compatible `/v1/chat/completions` server (LM Studio, Ollama, etc.)
-- Optional alternative endpoint(s) — e.g. run LM Studio as primary and Ollama as
-  alternative (or two instances of either) — automatically tried in order if the primary fails
+- Optional alternative endpoint(s) — e.g. LM Studio as primary, Ollama as alternative (or
+  two instances of either) — tried in order if the primary is unreachable or fails
 - Optional API key (`Authorization: Bearer <key>`) for servers that require one
 - Fully configurable model name, temperature, top_p, and max tokens
 - Editable system prompt and user prompt template, with `{{SourceLanguage}}`,
@@ -62,7 +62,7 @@ for the full file with comments.
 | `Endpoint` | `http://localhost:1234/v1/chat/completions` | Chat-completions URL. LM Studio default shown; Ollama's OpenAI-compatible default is `http://localhost:11434/v1/chat/completions`. |
 | `ApiKey` | *(empty)* | Sent as `Authorization: Bearer <ApiKey>` when non-empty. |
 | `Model` | `local-model` | Model name/id exactly as your server expects it. |
-| `AlternativeEndpoint` / `AlternativeApiKey` / `AlternativeModel` | *(empty)* | Optional alternative server, tried when the primary `Endpoint` fails (connection error, timeout, or non-200 response). Leave `AlternativeEndpoint` empty to disable. Add more with numbered keys: `AlternativeEndpoint2`, `AlternativeApiKey2`, `AlternativeModel2`, etc. (numbering must be contiguous). Named "Alternative" rather than "Fallback" to avoid confusion with `AutoTranslatorConfig.ini`'s own, unrelated `FallbackEndpoint` setting (which switches to an entirely different translator service). |
+| `AlternativeEndpoint` / `AlternativeApiKey` / `AlternativeModel` | *(empty)* | Optional alternative server, tried when the primary is unreachable or fails. Leave `AlternativeEndpoint` empty to disable. Add more with numbered keys (`AlternativeEndpoint2`, etc., contiguous). Named "Alternative" — not "Fallback" — to avoid confusion with `AutoTranslatorConfig.ini`'s own unrelated `FallbackEndpoint` setting, which swaps in a different translator service entirely. |
 | `AlternativeTimeoutSeconds` | `60` | How long to wait for each alternative endpoint before giving up on it. |
 | `Temperature` | `0.3` | Sampling temperature. |
 | `TopP` | `1.0` | Nucleus sampling parameter. |
@@ -87,15 +87,6 @@ The output DLL is written to `bin/Release/XUnity.AutoTranslator.Plugin.LlmTransl
 
 ## FAQ
 
-**Does this send my game's text to a cloud service?**
-No. It only talks to a server you run yourself, at whatever address you put in `Endpoint`.
-There is no hosted provider in the code and no telemetry.
-
-**Which model should I use?**
-Anything instruction-following that fits in your VRAM. Translation quality matters more
-than raw size, so a model with good coverage of your target language usually beats a
-larger general one. Lower `Temperature` (the `0.3` default) keeps output stable.
-
 **Nothing is being translated. Where do I look first?**
 `BepInEx/LogOutput.log`. The plugin logs a line on load with its version, primary
 endpoint/model, and alternative count. If that line is missing, the DLL is not in
@@ -104,21 +95,13 @@ not set in `AutoTranslatorConfig.ini`. If it is present, the problem is the serv
 config values.
 
 **I upgraded and my alternative endpoint stopped working.**
-The config keys were renamed. `Fallback*` (1.2.0) became `Secondary*` (2.0.0) and then
+The config keys were renamed twice: `Fallback*` (1.2.0) → `Secondary*` (2.0.0) →
 `Alternative*` (2.1.0). Old names are not read and produce no warning — rename them in
 `BepInEx/config/LlmTranslateOffline.yaml`.
-
-**Can I edit the prompt?**
-Yes. `SystemPrompt` and `UserPromptTemplate` are plain YAML block scalars in the config,
-with `{{SourceLanguage}}`, `{{DestinationLanguage}}` and `{{Input}}` placeholders. Restart
-the game to apply.
 
 **My model outputs its reasoning along with the translation.**
 `StripReasoning` (on by default) removes `<think>...</think>` blocks. If your model uses a
 different marker, it will come through — adjust `SystemPrompt` to suppress it.
-
-**Do I need Windows to build this?**
-No. `dotnet build -c Release` works on Linux, macOS and Windows.
 
 ## Limitations
 
@@ -127,14 +110,12 @@ No. `dotnet build -c Release` works on Linux, macOS and Windows.
   text-heavy scene is bounded by your model's throughput.
 - **No retry on a single endpoint.** Each alternative is tried once, in order. A server
   that is still loading a model returns an error and is skipped rather than retried.
-- **Primary endpoint timeout is not configurable.** `AlternativeTimeoutSeconds` applies
-  only to alternatives; the primary request uses XUnity.AutoTranslator's own timeout.
+- **Primary endpoint's real request timeout is not configurable** — only the preflight
+  reachability check and `AlternativeTimeoutSeconds` are; the request itself uses
+  XUnity.AutoTranslator's own timeout.
 - **No streaming.** The full completion is awaited before any text is returned.
 - **Prompts are global.** `SystemPrompt` / `UserPromptTemplate` apply to the primary and
   every alternative; they cannot be set per endpoint.
-- **Config keys were renamed twice** across 1.2.0 → 2.0.0 → 2.1.0, with no back-compat
-  shim for the old `Fallback*` / `Secondary*` names.
-- **Tested on Mono games only.** IL2CPP / BepInEx 6 is unverified.
 - Translation quality is entirely your local model's. This plugin only transports text.
 
 ## Versioning & Changelog
